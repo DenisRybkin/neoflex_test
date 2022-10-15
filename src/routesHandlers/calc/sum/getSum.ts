@@ -16,4 +16,4 @@ export const getSum: RouteHandler = {
       next(e);
     }
   }
-}qwq
+}
