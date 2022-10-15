@@ -1,29 +1,53 @@
-import express from "express"
-import { initDb } from './db'
-import { routeHandlers } from "./routes";
+import express, { Application } from "express"
+import { routeHandlers } from "./routesHandlers";
 import { HttpTypes } from "./enums/httpTypes";
-import { RouteHandler } from "./interfaces/routeHandler";
+import { RouteHandler } from "./interfaces/RouteHandler";
+import {config} from "./config";
+import { HandlerErrorMiddleware } from './middlewares/handlerErrorMiddleware';
 
-export const app = express();
-const port = 8080; // default port to listen
+export class App {
+    private static _instance: App;
+    private _app: Application;
 
-const routeHandlerMapper: Partial<Record<HttpTypes, (v: RouteHandler) => void>> = {
-    [HttpTypes.get]: (v) => app.get(v.uri, v.handler),
-    [HttpTypes.post]: (v) => app.post(v.uri, v.handler),
-    [HttpTypes.post]: (v) => app.put(v.uri, v.handler),
-    [HttpTypes.patch]: (v) => app.patch(v.uri, v.handler),
-    [HttpTypes.delete]: (v) => app.delete(v.uri, v.handler),
-}
+    constructor
+    (
+        private readonly _port: number = config.PORT,
+        private readonly _prefix: string = config.API_PREFIX
+    )
+    {
+        this._app = express();
+        this.initMiddthlewares();
+        this.initRoutes();
+    }
 
-routeHandlers.forEach(x => routeHandlerMapper[x.requestType](x))
+    public static get Instance(): App {
+        return this._instance || (this._instance = new this());
+    };
 
-// define a route handler for the default home page
-app.get("/", async (req, res) => {
-    res.send("Hello world!");
-});
+    private initMiddthlewares(): void {
+        this._app.use(HandlerErrorMiddleware);
+    }
 
-// start the Express server
-app.listen(port, async () => {
-    await initDb()
-    console.log(`server started at http://localhost:${ port }`);
-});
+    private get getRouteHandlerMapper(): Partial<Record<HttpTypes, (v: RouteHandler) => void>> {
+        return {
+            [HttpTypes.get]: (handler) => this._app.get(handler.uri, handler.handler),
+            [HttpTypes.post]: (handler) => this._app.post(handler.uri, handler.handler),
+            [HttpTypes.post]: (handler) => this._app.put(handler.uri, handler.handler),
+            [HttpTypes.patch]: (handler) => this._app.patch(handler.uri, handler.handler),
+            [HttpTypes.delete]: (handler) => this._app.delete(handler.uri, handler.handler),
+        }
+    }
+
+    private initRoutes (): void {
+        routeHandlers.forEach(item => this.getRouteHandlerMapper[item.requestType](item))
+    }
+
+    public async init(): Promise<void> {
+        this._app.listen(this._port, async () => {
+            console.log(`server started at http://localhost:${ this._port }`);
+        })
+    };
+};
+
+const app = App.Instance;
+app.init();
