@@ -4,5 +4,5 @@ export enum HttpTypes {
     put,
     patch,
     delete,
-    option
+    option,
 }
